@@ -3,6 +3,7 @@
 <p align="center">
   <a href="https://grdzelo.com"><picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/GiorgiGrdzelidze/GiorgiGrdzelidze/main/assets/hero-dark.svg" /><img src="https://raw.githubusercontent.com/GiorgiGrdzelidze/GiorgiGrdzelidze/main/assets/hero-light.svg" alt="Giorgi Grdzelidze — Senior Laravel engineer in Tbilisi, Georgia. 12+ years with Laravel, 5 open-source SDKs, founder of Pirdapir.ge." width="100%" /></picture></a>
   <a href="https://packagist.org/packages/giorgigrdzelidze/"><picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/GiorgiGrdzelidze/GiorgiGrdzelidze/main/assets/now-dark.svg" /><img src="https://raw.githubusercontent.com/GiorgiGrdzelidze/GiorgiGrdzelidze/main/assets/now-light.svg" alt="Latest release — refreshed daily from Packagist" width="100%" /></picture></a>
+  <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/GiorgiGrdzelidze/GiorgiGrdzelidze/main/assets/streak-dark.svg" /><img src="https://raw.githubusercontent.com/GiorgiGrdzelidze/GiorgiGrdzelidze/main/assets/streak-light.svg" alt="GitHub contribution streak — current and longest streak, refreshed daily" width="100%" /></picture>
 </p>
 
 <p align="center">
