@@ -5,38 +5,43 @@
       "date": "2026-10-16",
       "latest": "v1.1.0",
       "latest_date": "2026-10-16",
-      "downloads": 300
+      "downloads": 300,
+      "tests": "passing"
     },
     "laravel-rsge": {
       "version": "v1.0.0",
       "date": "2026-04-20",
       "latest": "v1.1.0-beta.4",
       "latest_date": "2026-11-19",
-      "downloads": 13
+      "downloads": 13,
+      "tests": "passing"
     },
     "laravel-fina-sdk": {
       "version": "v0.2.5",
       "date": "2026-11-09",
       "latest": "v0.2.5",
       "latest_date": "2026-11-09",
-      "downloads": 17
+      "downloads": 17,
+      "tests": "passing"
     },
     "laravel-shopify-sdk": {
       "version": "v2.1.0",
       "date": "2026-07-15",
       "latest": "v2.1.0",
       "latest_date": "2026-07-15",
-      "downloads": 9
+      "downloads": 9,
+      "tests": "passing"
     },
     "laravel-stringer": {
       "version": "v0.3.0",
       "date": "2026-05-18",
       "latest": "v0.3.0",
       "latest_date": "2026-05-18",
-      "downloads": 17
+      "downloads": 17,
+      "tests": "passing"
     }
   },
-  "contributions": 4946,
+  "contributions": 4947,
   "updated": "2026-11-25",
   "streak": {
     "current": 44,
@@ -44,7 +49,7 @@
     "longest": 44,
     "longest_start": "2026-10-13",
     "longest_end": "2026-11-25",
-    "year": 3376,
+    "year": 3377,
     "active_days": 650,
     "grid": {
       "start": "2026-06-14",
