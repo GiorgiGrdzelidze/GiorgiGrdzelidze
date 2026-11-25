@@ -230,13 +230,43 @@ def status_dot(d, T, x, y):
 
 
 # ------------------------------------------------------------------ hero
+def hero_stats():
+    contrib = STATS.get('contributions')
+    sdks = (kfmt(total_installs()), 'PACKAGIST INSTALLS') if TOTAL_IN == 'hero' else (str(len(PACKAGES)), 'OPEN-SOURCE SDKS')
+    return [(f'{TODAY.year - LARAVEL_SINCE}+', 'YEARS WITH LARAVEL'), sdks,
+            (kfmt(contrib) if contrib else '—', 'GITHUB CONTRIBUTIONS'), ('Pirdapir.ge', 'FOUNDER & DIRECTOR')]
+
+
+def composer(d, T, X, py, ph, cs):
+    """`$ composer require giorgigrdzelidze/<package>`, cycling through the packages."""
+    base = py + ph / 2 + cs * 0.36
+    prefix = [('$ ', 'mono', T['accent']), ('composer require ', 'mono', T['text']), ('giorgigrdzelidze/', 'mono', T['muted'])]
+    pw = sum(measure(t, 'mono', cs) for t, _, _ in prefix)
+    longest = max(measure(n, 'mono', cs) for n in NAMES)
+    d.raw(f'<rect x="{X}" y="{py}" width="{pw + longest + 70:.0f}" height="{ph}" rx="12" fill="{T["chip"]}" stroke="{T["chipb"]}"/>')
+    d.spans(X + 26, base, prefix, cs)
+    step = 15 / len(NAMES)
+    for i, name in enumerate(NAMES):
+        nx = X + 26 + pw
+        d.chars.setdefault('mono', set()).update(name)
+        d.raw(f'<g class="pkg{" p0" if i == 0 else ""}" style="animation-delay:{i * step:.1f}s"><text x="{nx:.1f}" y="{base:.1f}" font-family="Mon" font-size="{cs}" fill="{T["text"]}">{name}</text>'
+              f'<rect class="cur" x="{nx + measure(name, "mono", cs) + 5:.1f}" y="{base - cs * 0.92:.1f}" width="{cs / 2:.0f}" height="{cs * 1.15:.0f}" fill="{T["accent"]}"/></g>')
+    share = 100 / len(NAMES)
+    d.css.append('.pkg{opacity:0}.p0{opacity:1}'
+                 '@media (prefers-reduced-motion:no-preference){.pkg{animation:cycle 15s infinite}'
+                 f'@keyframes cycle{{0%{{opacity:0;transform:translateY(8px)}}{share * .12:.1f}%{{opacity:1;transform:translateY(0)}}'
+                 f'{share * .88:.1f}%{{opacity:1;transform:translateY(0)}}{share:.1f}%{{opacity:0;transform:translateY(-8px)}}100%{{opacity:0}}}}'
+                 '.cur{animation:blink 1s steps(1) infinite}@keyframes blink{50%{opacity:0}}}')
+
+
+def composer_width(cs):
+    return measure('$ composer require giorgigrdzelidze/', 'mono', cs) + max(measure(n, 'mono', cs) for n in NAMES) + 70
+
+
 def hero(theme):
     T = THEMES[theme]
     years = TODAY.year - LARAVEL_SINCE
-    contrib = STATS.get('contributions')
-    sdks = (kfmt(total_installs()), 'PACKAGIST INSTALLS') if TOTAL_IN == 'hero' else (str(len(PACKAGES)), 'OPEN-SOURCE SDKS')
-    stats = [(f'{years}+', 'YEARS WITH LARAVEL'), sdks,
-             (kfmt(contrib) if contrib else '—', 'GITHUB CONTRIBUTIONS'), ('Pirdapir.ge', 'FOUNDER & DIRECTOR')]
+    stats = hero_stats()
     if C:
         L = dict(H=652, top=78, rule=106, name_y=232, name_size=150, tag_y=(310, 352), tag_size=30,
                  py=386, ph=64, comp=24, sy=484, num_dy=84, num_size=62, lab_dy=124, glyph=380)
@@ -264,26 +294,7 @@ def hero(theme):
         [('and publish the ', 'sans', T['muted']), ('SDKs Georgian businesses run on.', 'sansm', T['text'])],
     ]):
         d.spans(X, y, line, L['tag_size'])
-    # composer line cycling through the packages
-    py, ph, cs = L['py'], L['ph'], L['comp']
-    base = py + ph / 2 + cs * 0.36
-    prefix = [('$ ', 'mono', T['accent']), ('composer require ', 'mono', T['text']), ('giorgigrdzelidze/', 'mono', T['muted'])]
-    pw = sum(measure(t, 'mono', cs) for t, _, _ in prefix)
-    longest = max(measure(n, 'mono', cs) for n in NAMES)
-    d.raw(f'<rect x="{X}" y="{py}" width="{pw + longest + 70:.0f}" height="{ph}" rx="12" fill="{T["chip"]}" stroke="{T["chipb"]}"/>')
-    d.spans(X + 26, base, prefix, cs)
-    step = 15 / len(NAMES)
-    for i, name in enumerate(NAMES):
-        nx = X + 26 + pw
-        d.chars.setdefault('mono', set()).update(name)
-        d.raw(f'<g class="pkg{" p0" if i == 0 else ""}" style="animation-delay:{i * step:.1f}s"><text x="{nx:.1f}" y="{base:.1f}" font-family="Mon" font-size="{cs}" fill="{T["text"]}">{name}</text>'
-              f'<rect class="cur" x="{nx + measure(name, "mono", cs) + 5:.1f}" y="{base - cs * 0.92:.1f}" width="{cs / 2:.0f}" height="{cs * 1.15:.0f}" fill="{T["accent"]}"/></g>')
-    share = 100 / len(NAMES)
-    d.css.append('.pkg{opacity:0}.p0{opacity:1}'
-                 '@media (prefers-reduced-motion:no-preference){.pkg{animation:cycle 15s infinite}'
-                 f'@keyframes cycle{{0%{{opacity:0;transform:translateY(8px)}}{share * .12:.1f}%{{opacity:1;transform:translateY(0)}}'
-                 f'{share * .88:.1f}%{{opacity:1;transform:translateY(0)}}{share:.1f}%{{opacity:0;transform:translateY(-8px)}}100%{{opacity:0}}}}'
-                 '.cur{animation:blink 1s steps(1) infinite}@keyframes blink{50%{opacity:0}}}')
+    composer(d, T, X, L['py'], L['ph'], L['comp'])
     sy, colw = L['sy'], (W - 2 * X) / 4
     d.raw(f'<line x1="{X}" x2="{W - X}" y1="{sy}" y2="{sy}" stroke="{T["border"]}"/>')
     for i, (num, label) in enumerate(stats):
@@ -524,6 +535,246 @@ def contact(theme):
     d.save('contact', theme)
 
 
+# ------------------------------------------------------------------ phone layouts (*-m-light.svg / *-m-dark.svg)
+# GitHub scales each image to the README's width. On a phone that is ~330px, so the 1600-wide images above
+# shrink to a fifth and their 19-26px labels and descriptions land at 4-5px. These versions are drawn on a
+# 720-wide canvas with bigger type and stacked layouts; the README serves them to screens under 1012px.
+MW = 720
+MX = 8 if OPEN else 36
+LAB = 22     # mono labels, ≈10px on a phone
+BODY = 28    # body copy, ≈13px
+
+
+def fit(text, key, size, maxw, ls=0):
+    """The largest size up to `size` at which `text` fits in `maxw`."""
+    while size > 8 and measure(text, key, size, ls) > maxw:
+        size -= 1
+    return size
+
+
+def label(d, T, x, y, text, fill=None, anchor='start', size=LAB):
+    d.t(x, y, text, 'mono', size, fill or T['faint'], anchor=anchor, ls=1.8)
+
+
+def chips(d, T, x0, y, tags, maxx):
+    """Tag chips that wrap onto a new row; returns the bottom edge."""
+    x, h = x0, 42
+    for tag in tags:
+        w = measure(tag, 'mono', 20) + 34
+        if x > x0 and x + w > maxx:
+            x, y = x0, y + h + 12
+        d.raw(f'<rect x="{x:.0f}" y="{y}" width="{w:.0f}" height="{h}" rx="21" fill="{T["chip"]}" stroke="{T["chipb"]}"/>')
+        d.t(x + 17, y + 28, tag, 'mono', 20, T['muted'])
+        x += w + 12
+    return y + h if tags else y - 28
+
+
+def hero_m(theme):
+    T = THEMES[theme]
+    W, X = MW, MX
+    years = TODAY.year - LARAVEL_SINCE
+    top, rule = 56, 84
+    ns = fit('Giorgi Grdzelidze', 'disp', 140, W - 2 * X + 6)
+    name_y = rule + 20 + round(dsize('disp', ns, 0)[0] * 0.74)
+    tag_y, lh, ts = name_y + 60, 42, 30
+    tagline = [[('Senior Laravel engineer. ', 'sansm', T['text']), ('I design APIs,', 'sans', T['muted'])],
+               [('wire up integrations and publish the', 'sans', T['muted'])],
+               [('SDKs Georgian businesses run on.', 'sansm', T['text'])]]
+    py, ph = tag_y + (len(tagline) - 1) * lh + 34, 58
+    cs = 22
+    while cs > 12 and composer_width(cs) > W - 2 * X:
+        cs -= 1
+    sy, rowh = py + ph + 40, 118
+    H = sy + 2 * rowh
+    d = Doc(W, H + 30, f'Giorgi Grdzelidze — Senior Laravel engineer in Tbilisi, Georgia. {years}+ years with Laravel, '
+                       f'{len(PACKAGES)} open-source SDKs, founder of Pirdapir.ge.', crop=(top - 32, H + 4))
+    card(d, T)
+    status_dot(d, T, X + 7, top - 8)
+    label(d, T, X + 30, top, 'AVAILABLE FOR SENIOR CONTRACTS', T['muted'])
+    if X + 30 + measure('AVAILABLE FOR SENIOR CONTRACTS', 'mono', LAB, 1.8) + 24 < W - X - measure('TBILISI, GE', 'mono', LAB, 1.8):
+        label(d, T, W - X, top, 'TBILISI, GE', anchor='end')  # only when there is room (not in the boxed variants)
+    d.raw(f'<line x1="{X}" x2="{W - X}" y1="{rule}" y2="{rule}" stroke="{T["border"]}"/>')
+    d.t(X - 3, name_y, 'Giorgi Grdzelidze', 'disp', ns, T['text'])
+    for i, line in enumerate(tagline):
+        assert sum(measure(t, k, ts) for t, k, _ in line) <= W - 2 * X, line
+        d.spans(X, tag_y + i * lh, line, ts)
+    composer(d, T, X, py, ph, cs)
+    # stats as a 2 × 2 grid
+    colw = (W - 2 * X) / 2
+    d.raw(f'<line x1="{X}" x2="{W - X}" y1="{sy}" y2="{sy}" stroke="{T["border"]}"/>')
+    d.raw(f'<line x1="{X}" x2="{W - X}" y1="{sy + rowh}" y2="{sy + rowh}" stroke="{T["border"]}"/>')
+    for i, (num, lab) in enumerate(hero_stats()):
+        r, c = divmod(i, 2)
+        cx, ty = X + c * colw + (28 if c else 0), sy + r * rowh
+        if c:
+            d.raw(f'<line x1="{X + colw:.1f}" x2="{X + colw:.1f}" y1="{ty + 22}" y2="{ty + rowh - 18}" stroke="{T["border"]}"/>')
+        d.t(cx, ty + 66, num, 'disp', 64, T['text'])
+        label(d, T, cx, ty + 98, lab)
+    d.save('hero-m', theme)
+
+
+def now_m(theme):
+    T = THEMES[theme]
+    W, X = MW, MX
+    rel = [(p['latest_date'], n, p['latest']) for n, p in STATS['packages'].items() if n in NAMES and p.get('latest_date')]
+    d = Doc(W, 128, 'Latest release', crop=(14, 122))
+    card(d, T)
+    status_dot(d, T, X + 7, 38)
+    label(d, T, X + 30, 46, 'LATEST RELEASE')
+    if rel:
+        when, name, ver = max(rel)
+        d.title = f'Latest release: {name} {ver}, {date(when)}'
+        label(d, T, W - X, 46, date(when).upper(), anchor='end')
+        d.t(X, 104, name, 'sansm', 36, T['text'])
+        d.t(X + measure(name, 'sansm', 36) + 16, 103, ver, 'mono', 28, T['accent'])
+    d.save('now-m', theme)
+
+
+def streak_m(theme):
+    T = THEMES[theme]
+    W, X = MW, MX
+    s = STATS.get('streak') or {}
+    cur, best, year = s.get('current', 0), s.get('longest', 0), s.get('year', 0)
+    days = lambda n: 'day' if n == 1 else 'days'
+    since = date(s['current_start']) if cur and s.get('current_start') else None
+    levels, start = (s.get('grid') or {}).get('levels', ''), (s.get('grid') or {}).get('start')
+    weeks, gap = -(-len(levels) // 7), 5
+    pitch = (W - 2 * X + gap) / max(weeks, 1)
+    hy = 248
+    H = hy + 7 * pitch - gap
+    d = Doc(W, H + 24, f'Contribution streak: {cur} {days(cur)} in a row' + (f' since {since}' if since else '')
+                       + f'. Longest streak {best} {days(best)}. {year:,} contributions in {TODAY.year}.', crop=(14, H + 12))
+    card(d, T)
+    if cur:
+        status_dot(d, T, X + 7, 38)
+    else:
+        d.raw(f'<circle cx="{X + 7}" cy="38" r="7" fill="none" stroke="{T["faint"]}" stroke-width="2"/>')
+    label(d, T, X + 30, 46, 'CONTRIBUTION STREAK', T['muted'])
+    started = datetime.date.fromisoformat(s['current_start']) if since else None
+    label(d, T, W - X, 46, f'SINCE {started:%b} {started.day}'.upper() if started else 'STARTS TODAY', anchor='end')
+    d.raw(f'<line x1="{X}" x2="{W - X}" y1="72" y2="72" stroke="{T["border"]}"/>')
+    # current streak large on the left, longest and this year stacked on the right
+    d.t(X - 4, 176, f'{cur:,}', 'disp', 150, T['text'])
+    d.t(X + measure(f'{cur:,}', 'disp', 150) + 12, 176, days(cur), 'sansm', 36, T['muted'])
+    label(d, T, X, 216, 'CURRENT STREAK')
+    mid = X + (W - 2 * X) * 0.5
+    d.raw(f'<line x1="{mid:.1f}" x2="{mid:.1f}" y1="96" y2="222" stroke="{T["border"]}"/>')
+    for y, lab, val in [(136, 'LONGEST', f'{best:,} {days(best)}'), (206, f'IN {TODAY.year}', f'{year:,}')]:
+        label(d, T, mid + 28, y - 2, lab)
+        d.t(W - X, y, val, 'sansb', 34, T['text'], anchor='end', ls=-0.4)
+    if levels and start:
+        first = datetime.date.fromisoformat(start)
+        streak_from = s.get('current_start') if cur else None
+        cell = pitch - gap
+        for i, lv in enumerate(levels):
+            day = (first + datetime.timedelta(days=i)).isoformat()
+            x, y, lv = X + (i // 7) * pitch, hy + (i % 7) * pitch, int(lv)
+            if lv == 0:
+                d.raw(f'<rect x="{x:.1f}" y="{y:.1f}" width="{cell:.1f}" height="{cell:.1f}" rx="5" fill="{T["chip"]}"/>')
+            else:
+                op = LEVEL_OPACITY[lv] * (1 if streak_from and day >= streak_from else .45)
+                d.raw(f'<rect x="{x:.1f}" y="{y:.1f}" width="{cell:.1f}" height="{cell:.1f}" rx="5" fill="{T["accent"]}" fill-opacity="{op:.2f}"/>')
+            if i == len(levels) - 1:
+                d.raw(f'<rect x="{x - 3:.1f}" y="{y - 3:.1f}" width="{cell + 6:.1f}" height="{cell + 6:.1f}" rx="7" fill="none" stroke="{T["accent"]}" stroke-width="2"/>')
+    d.save('streak-m', theme)
+
+
+def section_m(theme, num, title, note, name):
+    T = THEMES[theme]
+    W, X = MW, MX
+    d = Doc(W, 116, f'{num} — {title}')
+    label(d, T, X, 50, num, T['accent'])
+    d.t(X + 50, 56, title, 'disp', fit(title, 'disp', 66, W - 2 * X - 50), T['text'])
+    nw = measure(note, 'mono', LAB, 1.8)
+    label(d, T, X + 50, 98, note)
+    d.raw(f'<line x1="{X + 50 + nw + 22:.0f}" x2="{W - X}" y1="91" y2="91" stroke="{T["border"]}"/>')
+    d.save(f'{name}-m', theme)
+
+
+def pkg_row_m(theme, idx, name, cat, desc, tags, slug=None, link=None):
+    T = THEMES[theme]
+    W, X = MW, MX
+    info = {} if link else STATS['packages'].get(name, {})
+    meta = ([(info['version'], 'mono', T['muted']), (f' · {date(info["date"], "short")}', 'mono', T['faint'])]
+            if info.get('version') else [(link, 'mono', T['faint'])] if link else [])
+    lines = wrap(desc, 'sans', BODY, W - 2 * X)
+    probe = Doc(W, 0, '')  # measure the chip rows before sizing the image
+    bottom = chips(probe, T, X, 186 + (len(lines) - 1) * 40 + 30, tags, W - X)
+    d = Doc(W, bottom + 40, f'{name} — {desc}', crop=(16, bottom + 26))
+    card(d, T)
+    label(d, T, X, 46, f'{idx:02d}', T['accent'])
+    label(d, T, X + 48, 46, cat)
+    d.t(X, 102, name, 'sansb', fit(name, 'sansb', 46, W - 2 * X - 140, -0.8), T['text'], ls=-0.8)
+    if info.get('downloads', 0) >= SHOW_DOWNLOADS_FROM:
+        downloads(d, T, W - X, 102, info['downloads'])
+    else:
+        arrow(d, W - X, 72, 20, T['muted'])
+    if meta:
+        d.spans(X, 140, meta, 20, ls=1.2)
+    for i, line in enumerate(lines):
+        d.t(X, 186 + i * 40, line, 'sans', BODY, T['muted'])
+    chips(d, T, X, 186 + (len(lines) - 1) * 40 + 30, tags, W - X)
+    d.save(f'pkg-{slug or name}-m', theme)
+
+
+def more_row_m(theme):
+    pkg_row_m(theme, len(PACKAGES) + 1, 'grdzelo.com', 'ELSEWHERE',
+              'More work: client projects, the story behind Pirdapir.ge and notes on shipping Laravel.',
+              [], slug='more', link='CASE STUDIES · WRITING')
+
+
+def contact_m(theme):
+    T = THEMES[theme]
+    W, X = MW, MX
+    top = 56
+    hs = fit('Have a Laravel project', 'disp', 100, W - 2 * X + 6)
+    ha = dsize('disp', hs, 0)[0]
+    y1 = top + 30 + round(ha * 0.74)
+    y2 = y1 + round(ha * 1.14)
+    rule = y2 + 40
+    rows = [('START A PROJECT', 'grdzelo.com/contact'), ('EMAIL', 'grdzelog@gmail.com'), ('RESPONSE', 'Within two business days')]
+    H = rule + 36 + len(rows) * 86
+    d = Doc(W, H + 20, 'Have a Laravel project in mind? Let’s talk — grdzelo.com/en/contact', crop=(top - 32, H))
+    card(d, T)
+    status_dot(d, T, X + 7, top - 8)
+    label(d, T, X + 30, top, 'OPEN TO NEW WORK', T['muted'])
+    d.t(X - 3, y1, 'Have a Laravel project', 'disp', hs, T['text'])
+    d.spans(X - 3, y2, [('in mind? ', 'disp', T['text']), ('Let’s talk.', 'disp', T['accent'])], hs)
+    d.raw(f'<line x1="{X}" x2="{W - X}" y1="{rule}" y2="{rule}" stroke="{T["border"]}"/>')
+    for i, (lab, value) in enumerate(rows):
+        y = rule + 48 + i * 86
+        label(d, T, X, y, lab)
+        d.t(X, y + 38, value, 'sansm', 32, T['text'])
+    arrow(d, X + measure('grdzelo.com/contact', 'sansm', 32) + 34, rule + 48 + 38 - 22, 15, T['accent'], 2.4)
+    d.save('contact-m', theme)
+
+
+def link_row_m(theme, idx, slug, cat, name, desc):
+    T = THEMES[theme]
+    W, X = MW, MX
+    lines = wrap(desc, 'sans', 26, W - 2 * X - 50 - 50)[:2]
+    H = 92 + (len(lines) - 1) * 34
+    d = Doc(W, H + 22, f'{name} — {desc}', crop=(10, H + 14))
+    card(d, T)
+    label(d, T, X, 45, f'{idx:02d}', T['accent'])
+    d.t(X + 50, 48, name, 'sansb', 36, T['text'], ls=-0.4)
+    cx = X + 50 + measure(name, 'sansb', 36, -0.4) + 18
+    assert cx + measure(cat, 'mono', LAB, 1.8) < W - X - 48, name
+    label(d, T, cx, 45, cat)
+    for i, line in enumerate(lines):
+        d.t(X + 50, 88 + i * 34, line, 'sans', 26, T['muted'])
+    arrow(d, W - X, 30, 20, T['accent'] if idx == 1 else T['muted'])
+    d.save(f'link-{slug}-m', theme)
+
+
+SECTIONS = [  # num, title, note, file
+    ('01', 'Open-source SDKs', f'{kfmt(total_installs())} INSTALLS ON PACKAGIST' if TOTAL_IN == 'header' else 'GIORGIGRDZELIDZE/*', 'sec-open-source'),
+    ('02', 'Stack', 'WHAT I BUILD WITH', 'sec-stack'),
+    ('03', 'Work together', 'TBILISI · REMOTE', 'sec-contact'),
+    ('04', 'Elsewhere', 'LINKS', 'sec-links'),
+]
+
+
 if __name__ == '__main__':
     os.makedirs(OUT, exist_ok=True)
     for th in THEMES:
@@ -532,12 +783,22 @@ if __name__ == '__main__':
         streak(th)
         for i, link in enumerate(LINKS, 1):
             link_row(th, i, *link)
-        section(th, '01', 'Open-source SDKs', f'{kfmt(total_installs())} INSTALLS ON PACKAGIST' if TOTAL_IN == 'header' else 'GIORGIGRDZELIDZE/*', 'sec-open-source')
-        section(th, '02', 'Stack', 'WHAT I BUILD WITH', 'sec-stack')
-        section(th, '03', 'Work together', 'TBILISI · REMOTE', 'sec-contact')
-        section(th, '04', 'Elsewhere', 'LINKS', 'sec-links')
+        for sec in SECTIONS:
+            section(th, *sec)
         for i, p in enumerate(PACKAGES, 1):
             pkg_row(th, i, *p)
         more_row(th)
         contact(th)
+        # phone versions
+        hero_m(th)
+        now_m(th)
+        streak_m(th)
+        for i, link in enumerate(LINKS, 1):
+            link_row_m(th, i, *link)
+        for sec in SECTIONS:
+            section_m(th, *sec)
+        for i, p in enumerate(PACKAGES, 1):
+            pkg_row_m(th, i, *p)
+        more_row_m(th)
+        contact_m(th)
     print(f'built {len(os.listdir(OUT))} files in {OUT} ({VARIANT})')
