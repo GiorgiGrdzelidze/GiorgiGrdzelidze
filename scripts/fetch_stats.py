@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Fetch live profile stats (Packagist releases + GitHub contributions) into data/stats.json.
+"""Fetch live profile stats (Packagist releases + GitHub contributions and streak) into data/stats.json.
 
 Anything that fails keeps its previous value, so a flaky API never blanks the profile.
 """
@@ -30,13 +30,57 @@ def package(name):
     }
 
 
-def contributions(year):
+def calendar(year):
+    """One year of the public contribution graph: (total for the year, {date: (count, level 0-4)})."""
     html = get(f'https://github.com/users/{USER}/contributions?from={year}-01-01&to={year}-12-31',
                {'X-Requested-With': 'XMLHttpRequest'})
+    tips = {}  # cell id -> count, from the screen-reader tooltips ("9 contributions on November 24th.")
+    for cell_id, text in re.findall(r'<tool-tip[^>]*\bfor="([^"]+)"[^>]*>\s*([^<]*)</tool-tip>', html):
+        m = re.match(r'(No|[\d,]+) contributions? on', text.strip())
+        if m:
+            tips[cell_id] = 0 if m.group(1) == 'No' else int(m.group(1).replace(',', ''))
+    days = {}
+    for tag in re.findall(r'<td\b[^>]*\bdata-date="[^"]+"[^>]*>', html):
+        attr = dict(re.findall(r'([\w-]+)="([^"]*)"', tag))
+        level = int(attr.get('data-level', 0))
+        days[attr['data-date']] = (tips.get(attr.get('id'), level), level)  # level as a fallback count: still >0 when active
     m = re.search(r'([\d,]+)\s+contributions?\s+in\s+' + str(year), html)
-    if m:
-        return int(m.group(1).replace(',', ''))
-    return sum(int(n) for n in re.findall(r'(\d+) contributions? on', html))
+    total = int(m.group(1).replace(',', '')) if m else sum(c for c, _ in days.values())
+    return total, days
+
+
+def streaks(days, today, weeks=24):
+    """Current and longest run of days with at least one contribution, plus the last `weeks` of levels.
+
+    Today not counting yet (the run happens at 07:17 Tbilisi) doesn't break the current streak.
+    """
+    dates = sorted(d for d in days if d <= today.isoformat())
+    longest = run = 0
+    longest_span = run_start = None
+    for d in dates:
+        if days[d][0] > 0:
+            run_start = d if run == 0 else run_start
+            run += 1
+            if run > longest:
+                longest, longest_span = run, (run_start, d)
+        else:
+            run = 0
+    i = len(dates) - 1
+    if i >= 0 and days[dates[i]][0] == 0:
+        i -= 1  # nothing yet today: the streak is still alive if yesterday counted
+    current, start = 0, None
+    while i >= 0 and days[dates[i]][0] > 0:
+        current, start, i = current + 1, dates[i], i - 1
+    # the heatmap: whole weeks (Sunday first, like GitHub) ending with the current one
+    first = today - datetime.timedelta(days=(today.weekday() + 1) % 7 + 7 * (weeks - 1))
+    span = [(first + datetime.timedelta(days=n)).isoformat() for n in range((today - first).days + 1)]
+    return {
+        'current': current, 'current_start': start,
+        'longest': longest, 'longest_start': longest_span and longest_span[0], 'longest_end': longest_span and longest_span[1],
+        'year': sum(c for d, (c, _) in days.items() if d.startswith(str(today.year)) and d <= today.isoformat()),
+        'active_days': sum(1 for d in dates if days[d][0] > 0),
+        'grid': {'start': span[0], 'end': span[-1], 'levels': ''.join(str(days.get(d, (0, 0))[1]) for d in span)},
+    }
 
 
 def main():
@@ -52,7 +96,13 @@ def main():
         except Exception as e:  # keep the last known value
             print(f'packagist {name} failed: {e}')
     try:
-        stats['contributions'] = sum(contributions(y) for y in range(FIRST_YEAR, datetime.date.today().year + 1))
+        today, total, days = datetime.date.today(), 0, {}
+        for y in range(FIRST_YEAR, today.year + 1):
+            year_total, year_days = calendar(y)
+            total += year_total
+            days.update(year_days)
+        stats['contributions'] = total
+        stats['streak'] = streaks(days, today)
     except Exception as e:
         print(f'contributions failed: {e}')
     stats['updated'] = datetime.date.today().isoformat()

@@ -318,6 +318,71 @@ def now(theme):
     d.save('now', theme)
 
 
+# ------------------------------------------------------------------ contribution streak
+CELL, GAP = 17, 5                       # heatmap cell and gap; one column per week, Sunday on top like GitHub
+LEVEL_OPACITY = [0, .32, .55, .78, 1]   # GitHub's data-level 0-4 as accent opacity
+
+
+def streak(theme):
+    T = THEMES[theme]
+    s = STATS.get('streak') or {}
+    cur, best, year = s.get('current', 0), s.get('longest', 0), s.get('year', 0)
+    days = lambda n: 'day' if n == 1 else 'days'
+    since = date(s['current_start']) if cur and s.get('current_start') else None
+    d = Doc(1600, 290, f'Contribution streak: {cur} {days(cur)} in a row' + (f' since {since}' if since else '')
+                       + f'. Longest streak {best} {days(best)}. {year:,} contributions in {TODAY.year}.', crop=(22, 272))
+    W, X = d.w, (8 if OPEN else 56)
+    card(d, T)
+    # header: status, label, since
+    if cur:
+        status_dot(d, T, X + 7, 52)
+    else:
+        d.raw(f'<circle cx="{X + 7}" cy="52" r="7" fill="none" stroke="{T["faint"]}" stroke-width="2"/>')
+    d.t(X + 30, 60, 'CONTRIBUTION STREAK', 'mono', 20, T['muted'], ls=2.4)
+    note = f'EVERY DAY SINCE {since.upper()}' if since else 'NEXT ONE STARTS TODAY'
+    d.t(W - X, 60, note, 'mono', 20, T['faint'], anchor='end', ls=2.4)
+    d.raw(f'<line x1="{X}" x2="{W - X}" y1="86" y2="86" stroke="{T["border"]}"/>')
+    # heatmap of the last weeks, right-aligned; the current streak at full strength, older days dimmed
+    grid = s.get('grid') or {}
+    levels, start = grid.get('levels', ''), grid.get('start')
+    weeks = -(-len(levels) // 7)
+    hx, hy, pitch = W - X - (weeks * (CELL + GAP) - GAP), 106, CELL + GAP
+    if levels and start:
+        first = datetime.date.fromisoformat(start)
+        streak_from = s.get('current_start') if cur else None
+        for i, lv in enumerate(levels):
+            day = (first + datetime.timedelta(days=i)).isoformat()
+            x, y = hx + (i // 7) * pitch, hy + (i % 7) * pitch
+            lv = int(lv)
+            if lv == 0:
+                d.raw(f'<rect x="{x}" y="{y}" width="{CELL}" height="{CELL}" rx="4" fill="{T["chip"]}"/>')
+            else:
+                op = LEVEL_OPACITY[lv] * (1 if streak_from and day >= streak_from else .45)
+                d.raw(f'<rect x="{x}" y="{y}" width="{CELL}" height="{CELL}" rx="4" fill="{T["accent"]}" fill-opacity="{op:.2f}"/>')
+            if i == len(levels) - 1:  # today
+                d.raw(f'<rect x="{x - 3}" y="{y - 3}" width="{CELL + 6}" height="{CELL + 6}" rx="6" fill="none" stroke="{T["accent"]}" stroke-width="2"/>')
+    # numbers: current streak large, then longest and this year, in the hero's stat style
+    base, lab = 214, 253
+    cols = [((f'{cur:,}', 150), days(cur), 'CURRENT STREAK'),
+            ((f'{best:,}', 62), days(best), 'LONGEST STREAK'),
+            ((f'{year:,}', 62), None, f'CONTRIBUTIONS IN {TODAY.year}')]
+    x = X
+    for i, ((num, size), unit, label) in enumerate(cols):
+        if i:
+            d.raw(f'<line x1="{x:.1f}" x2="{x:.1f}" y1="{base - 70}" y2="{lab + 8}" stroke="{T["border"]}"/>')
+            x += 40
+        d.t(x - (4 if i == 0 else 0), base, num, 'disp', size, T['text'])
+        w = measure(num, 'disp', size)
+        if unit:
+            usize = 36 if i == 0 else 26
+            d.t(x + w + (14 if i == 0 else 10), base, unit, 'sansm', usize, T['muted'])
+            w += measure(unit, 'sansm', usize) + 14
+        d.t(x, lab, label, 'mono', 19, T['faint'], ls=2.2)
+        x += max(w, measure(label, 'mono', 19, 2.2)) + 40
+    assert x - 40 + 48 < hx, f'streak numbers run into the heatmap ({x - 40:.0f} vs {hx})'
+    d.save('streak', theme)
+
+
 # ------------------------------------------------------------------ link list
 LINKS = [  # slug, category, name, short description
     ('site', 'WEBSITE', 'grdzelo.com', 'Portfolio, case studies and how I work'),
@@ -464,6 +529,7 @@ if __name__ == '__main__':
     for th in THEMES:
         hero(th)
         now(th)
+        streak(th)
         for i, link in enumerate(LINKS, 1):
             link_row(th, i, *link)
         section(th, '01', 'Open-source SDKs', f'{kfmt(total_installs())} INSTALLS ON PACKAGIST' if TOTAL_IN == 'header' else 'GIORGIGRDZELIDZE/*', 'sec-open-source')
