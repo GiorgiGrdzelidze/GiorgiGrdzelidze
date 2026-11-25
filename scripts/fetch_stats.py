@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""Fetch live profile stats (Packagist releases + GitHub contributions and streak) into data/stats.json.
+"""Fetch live profile stats (Packagist releases, test status, GitHub contributions and streak) into data/stats.json.
 
 Anything that fails keeps its previous value, so a flaky API never blanks the profile.
 """
-import datetime, json, os, re, urllib.request
+import datetime, json, os, re, urllib.error, urllib.request
 
 USER = 'GiorgiGrdzelidze'
 VENDOR = 'giorgigrdzelidze'
@@ -28,6 +28,33 @@ def package(name):
         'latest': tags[0]['version'], 'latest_date': tags[0]['time'][:10],
         'downloads': pkg['downloads']['total'],
     }
+
+
+def github_api(path):
+    """GET from the GitHub API, with the workflow's token when there is one (60 requests/hour without)."""
+    headers = {'Accept': 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28'}
+    token = os.environ.get('GITHUB_TOKEN')
+    try:
+        return json.loads(get(f'https://api.github.com/{path}', {**headers, **({'Authorization': f'Bearer {token}'} if token else {})}))
+    except urllib.error.HTTPError as e:
+        if token and e.code in (401, 403):
+            return json.loads(get(f'https://api.github.com/{path}', headers))
+        raise
+
+
+def tests(name):
+    """'passing' when the latest finished run of every workflow on main succeeded, otherwise 'failing'.
+
+    Pull requests, cancelled and skipped runs don't count; only what landed on main does.
+    """
+    runs = github_api(f'repos/{USER}/{name}/actions/runs?branch=main&per_page=50')['workflow_runs']
+    latest = {}
+    for run in runs:  # newest first
+        if run['event'] != 'pull_request' and run['status'] == 'completed' and run['conclusion'] not in ('cancelled', 'skipped', 'neutral', None):
+            latest.setdefault(run['workflow_id'], run['conclusion'])
+    if not latest:
+        raise ValueError('no finished runs on main')
+    return 'passing' if all(c == 'success' for c in latest.values()) else 'failing'
 
 
 def calendar(year):
@@ -91,10 +118,17 @@ def main():
         stats = {}
     stats.setdefault('packages', {})
     for name in PACKAGES:
+        last = stats['packages'].get(name, {})
         try:
             stats['packages'][name] = package(name)
         except Exception as e:  # keep the last known value
             print(f'packagist {name} failed: {e}')
+        try:
+            stats['packages'][name]['tests'] = tests(name)
+        except Exception as e:
+            print(f'tests {name} failed: {e}')
+            if 'tests' in last:
+                stats['packages'][name]['tests'] = last['tests']
     try:
         today, total, days = datetime.date.today(), 0, {}
         for y in range(FIRST_YEAR, today.year + 1):
