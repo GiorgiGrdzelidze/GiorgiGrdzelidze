@@ -10,6 +10,7 @@ Usage: FONT_DIR=node_modules/@fontsource python scripts/generate.py assets
        VARIANT=compact|tinted|ruled|outline|surface switches the card style (default: open)
        PKG_LAYOUT=stacked puts each package in one column instead of name | description (default: split)
        TOTAL_IN=hero moves total Packagist installs from the section title into the top stats
+       SDK_NOTE=installs keeps installs in section 01's title even when every package's tests pass (default: tests)
 """
 import base64, datetime, io, json, os, sys
 from fontTools import subset
@@ -22,6 +23,7 @@ STATS_FILE = os.environ.get('STATS_FILE', os.path.join(ROOT, 'data', 'stats.json
 LARAVEL_SINCE = 2014          # "N+ years with Laravel"
 SHOW_DOWNLOADS_FROM = 1000    # a package row shows its own count once it passes this; below it, an arrow
 TOTAL_IN = os.environ.get('TOTAL_IN', 'header')  # where total Packagist installs go: header (section 01) | hero
+SDK_NOTE = os.environ.get('SDK_NOTE', 'tests')   # section 01's note when all tests pass: tests | installs
 TODAY = datetime.date.today()
 
 PACKAGES = [  # name, category, description, tags
@@ -55,10 +57,10 @@ STATS.setdefault('packages', {})
 THEMES = {
     'dark': dict(text='#e6edf3', muted='#9198a1', faint='#7d8590', border='#3d444d', accent='#3fb950',
                  grid='rgba(145,152,161,.22)', chip='rgba(101,108,118,.2)', chipb='#3d444d',
-                 glyph='rgba(145,152,161,.18)', surface='rgba(101,108,118,.14)', surfaceb='rgba(61,68,77,.7)'),
+                 glyph='rgba(145,152,161,.18)', surface='rgba(101,108,118,.14)', surfaceb='rgba(61,68,77,.7)', danger='#f85149'),
     'light': dict(text='#1f2328', muted='#59636e', faint='#818b98', border='#d1d9e0', accent='#1a7f37',
                   grid='rgba(129,139,152,.3)', chip='rgba(129,139,152,.12)', chipb='#d1d9e0',
-                  glyph='rgba(129,139,152,.22)', surface='rgba(129,139,152,.07)', surfaceb='rgba(209,217,224,.7)'),
+                  glyph='rgba(129,139,152,.22)', surface='rgba(129,139,152,.07)', surfaceb='rgba(209,217,224,.7)', danger='#d1242f'),
 }
 
 VARIANTS = {
@@ -460,6 +462,50 @@ def tag_chips(d, T, x, y, tags):
         x += tw + 46
 
 
+def badge_width(status, size):
+    return size * 1.12 + measure('TESTS PASSING' if status == 'passing' else 'TESTS FAILING', 'mono', size, 1.2)
+
+
+def tests_badge(d, T, x, y, status, size, anchor='start'):
+    """A check and TESTS PASSING (accent), or a cross and TESTS FAILING (red), on baseline y."""
+    ok = status == 'passing'
+    color, text = (T['accent'], 'TESTS PASSING') if ok else (T['danger'], 'TESTS FAILING')
+    s, gap = size * 0.62, size * 0.5
+    w = badge_width(status, size)
+    x0, top = (x - w if anchor == 'end' else x), y - size * 0.68
+    if ok:
+        path = f'M{x0:.1f} {top + s * .55:.1f} L{x0 + s * .36:.1f} {top + s * .9:.1f} L{x0 + s:.1f} {top + s * .1:.1f}'
+    else:
+        path = (f'M{x0 + s * .12:.1f} {top + s * .12:.1f} L{x0 + s * .88:.1f} {top + s * .88:.1f} '
+                f'M{x0 + s * .88:.1f} {top + s * .12:.1f} L{x0 + s * .12:.1f} {top + s * .88:.1f}')
+    d.raw(f'<path d="{path}" fill="none" stroke="{color}" stroke-width="{size * .13:.1f}" stroke-linecap="round" stroke-linejoin="round"/>')
+    d.t(x0 + s + gap, y, text, 'mono', size, color, ls=1.2)
+
+
+def meta_row(d, T, x, y, meta, status, size, anchor='start'):
+    """version · date, then the test badge when the package has a status."""
+    if status:
+        meta = meta + [(' · ', 'mono', T['faint'])]
+    mw = sum(measure(t, 'mono', size, 1.2) for t, _, _ in meta)
+    bw = badge_width(status, size) if status else 0
+    x0 = x - mw - bw if anchor == 'end' else x
+    d.spans(x0, y, meta, size, ls=1.2)
+    if status:
+        tests_badge(d, T, x0 + mw, y, status, size)
+
+
+def tests_title(info):
+    return f' Tests {info["tests"]}.' if info.get('tests') else ''
+
+
+def sdk_note():
+    """Section 01's note: tests passing on every package when that is true, otherwise total installs."""
+    status = [STATS['packages'].get(n, {}).get('tests') for n in NAMES]
+    if SDK_NOTE == 'tests' and all(st == 'passing' for st in status):
+        return f'TESTS PASSING ON ALL {len(NAMES)}'
+    return f'{kfmt(total_installs())} INSTALLS ON PACKAGIST' if TOTAL_IN == 'header' else 'GIORGIGRDZELIDZE/*'
+
+
 def pkg_row(theme, idx, name, cat, desc, tags, slug=None, link=None):
     """One package per row. link=(text, ...) turns the row into the 'more work' row with an arrow instead of stats."""
     T = THEMES[theme]
@@ -469,7 +515,7 @@ def pkg_row(theme, idx, name, cat, desc, tags, slug=None, link=None):
             if info.get('version') else [(link, 'mono', T['faint'])] if link else [])
     if PKG_LAYOUT == 'split':
         lines = wrap(desc, 'sans', 26, 1600 - X - RIGHT_X - STAT_W)[:2]
-        d = Doc(1600, 196, f'{name} — {desc}', crop=(20, 180))
+        d = Doc(1600, 196, f'{name} — {desc}' + tests_title(info), crop=(20, 180))
         card(d, T)
         d.t(X, 56, f'{idx:02d}', 'mono', 21, T['accent'], ls=2)
         d.t(X + 56, 56, cat, 'mono', 21, T['faint'], ls=2)
@@ -479,7 +525,7 @@ def pkg_row(theme, idx, name, cat, desc, tags, slug=None, link=None):
         else:
             arrow(d, d.w - X, 92, 22, T['muted'])
         if meta:
-            d.spans(X, 156, meta, 19, ls=1.2)
+            meta_row(d, T, X, 156, meta, info.get('tests'), 19)
         for i, line in enumerate(lines):
             d.t(RIGHT_X, 66 + i * 36, line, 'sans', 26, T['muted'])
         tag_chips(d, T, RIGHT_X, 124, tags)
@@ -487,12 +533,12 @@ def pkg_row(theme, idx, name, cat, desc, tags, slug=None, link=None):
         lines = wrap(desc, 'sans', 26, 1600 - 2 * X)[:2]
         ty = 166 + (len(lines) - 1) * 36 + 24
         bottom = ty + 40 if tags else ty - 14
-        d = Doc(1600, bottom + 32, f'{name} — {desc}', crop=(20, bottom + 16))
+        d = Doc(1600, bottom + 32, f'{name} — {desc}' + tests_title(info), crop=(20, bottom + 16))
         card(d, T)
         d.t(X, 56, f'{idx:02d}', 'mono', 21, T['accent'], ls=2)
         d.t(X + 56, 56, cat, 'mono', 21, T['faint'], ls=2)
         if meta:
-            d.spans(d.w - X, 55, meta, 19, anchor='end', ls=1.2)
+            meta_row(d, T, d.w - X, 55, meta, info.get('tests'), 19, anchor='end')
         d.t(X, 120, name, 'sansb', 48, T['text'], ls=-0.8)
         if info.get('downloads', 0) >= SHOW_DOWNLOADS_FROM:
             downloads(d, T, d.w - X, 120, info['downloads'])
@@ -700,7 +746,7 @@ def pkg_row_m(theme, idx, name, cat, desc, tags, slug=None, link=None):
     lines = wrap(desc, 'sans', BODY, W - 2 * X)
     probe = Doc(W, 0, '')  # measure the chip rows before sizing the image
     bottom = chips(probe, T, X, 186 + (len(lines) - 1) * 40 + 30, tags, W - X)
-    d = Doc(W, bottom + 40, f'{name} — {desc}', crop=(16, bottom + 26))
+    d = Doc(W, bottom + 40, f'{name} — {desc}' + tests_title(info), crop=(16, bottom + 26))
     card(d, T)
     label(d, T, X, 46, f'{idx:02d}', T['accent'])
     label(d, T, X + 48, 46, cat)
@@ -710,7 +756,7 @@ def pkg_row_m(theme, idx, name, cat, desc, tags, slug=None, link=None):
     else:
         arrow(d, W - X, 72, 20, T['muted'])
     if meta:
-        d.spans(X, 140, meta, 20, ls=1.2)
+        meta_row(d, T, X, 140, meta, info.get('tests'), 20)
     for i, line in enumerate(lines):
         d.t(X, 186 + i * 40, line, 'sans', BODY, T['muted'])
     chips(d, T, X, 186 + (len(lines) - 1) * 40 + 30, tags, W - X)
@@ -768,7 +814,7 @@ def link_row_m(theme, idx, slug, cat, name, desc):
 
 
 SECTIONS = [  # num, title, note, file
-    ('01', 'Open-source SDKs', f'{kfmt(total_installs())} INSTALLS ON PACKAGIST' if TOTAL_IN == 'header' else 'GIORGIGRDZELIDZE/*', 'sec-open-source'),
+    ('01', 'Open-source SDKs', sdk_note(), 'sec-open-source'),
     ('02', 'Stack', 'WHAT I BUILD WITH', 'sec-stack'),
     ('03', 'Work together', 'TBILISI · REMOTE', 'sec-contact'),
     ('04', 'Elsewhere', 'LINKS', 'sec-links'),
