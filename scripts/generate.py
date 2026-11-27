@@ -10,7 +10,7 @@ Usage: FONT_DIR=node_modules/@fontsource python scripts/generate.py assets
        VARIANT=compact|tinted|ruled|outline|surface switches the card style (default: open)
        PKG_LAYOUT=stacked puts each package in one column instead of name | description (default: split)
        TOTAL_IN=hero moves total Packagist installs from the section title into the top stats
-       SDK_NOTE=installs keeps installs in section 01's title even when every package's tests pass (default: tests)
+       SDK_NOTE=tests says 'TESTS PASSING ON ALL N' in section 01's title while every package passes (default: installs)
 """
 import base64, datetime, io, json, os, sys
 from fontTools import subset
@@ -23,7 +23,7 @@ STATS_FILE = os.environ.get('STATS_FILE', os.path.join(ROOT, 'data', 'stats.json
 LARAVEL_SINCE = 2014          # "N+ years with Laravel"
 SHOW_DOWNLOADS_FROM = 1000    # a package row shows its own count once it passes this; below it, an arrow
 TOTAL_IN = os.environ.get('TOTAL_IN', 'header')  # where total Packagist installs go: header (section 01) | hero
-SDK_NOTE = os.environ.get('SDK_NOTE', 'tests')   # section 01's note when all tests pass: tests | installs
+SDK_NOTE = os.environ.get('SDK_NOTE', 'installs')  # section 01's note: installs | tests (test status is on each package row)
 TODAY = datetime.date.today()
 
 PACKAGES = [  # name, category, description, tags
@@ -499,7 +499,7 @@ def tests_title(info):
 
 
 def sdk_note():
-    """Section 01's note: tests passing on every package when that is true, otherwise total installs."""
+    """Section 01's note: total installs, or with SDK_NOTE=tests, tests passing on every package when that is true."""
     status = [STATS['packages'].get(n, {}).get('tests') for n in NAMES]
     if SDK_NOTE == 'tests' and all(st == 'passing' for st in status):
         return f'TESTS PASSING ON ALL {len(NAMES)}'
